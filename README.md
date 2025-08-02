@@ -1,8 +1,8 @@
-Simple Guide to the Home Loan App
-This guide will help you use the home loan calculator easily.
+Home Loan Amortization Schedule
+This guide explains how to use the home loan calculator.
 
 1. Using the Calculator
-This is where you tell the website about your loan.
+This is where you enter your loan details.
 
 Loan Type: Choose if your interest rate will stay the same (Fixed Rate) or might change (Floating Rate).
 
@@ -44,6 +44,3 @@ Extra Monthly Payment: How much extra money can you pay towards your loan each m
 Get Suggestions: Click this button to get a simple plan from an AI.
 
 Please Note: The suggestions are just ideas from a computer. They are not professional advice. You should always talk to a financial expert for real advice.
-
-4. Help
-There is a question mark button (?) at the top of the page. Click it to learn more about the website or to find out how to contact the person who made it.
