@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   LineChart,
   Line,
@@ -10,60 +10,57 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-// This is the main App component that renders the entire application.
+// Main App component for the Home Loan Amortization Schedule
 const App = () => {
   // State variables for user inputs
   const [principal, setPrincipal] = useState(3000000);
   const [annualRate, setAnnualRate] = useState(7.0);
   const [years, setYears] = useState(20);
-  const [paymentFrequency, setPaymentFrequency] = useState('monthly');
   const [showHelpModal, setShowHelpModal] = useState(false);
-  const [annualSalary, setAnnualSalary] = useState(''); // New state for user's annual salary
-  const [additionalAffordability, setAdditionalAffordability] = useState(''); // New state for additional monthly payments
-  const [suggestions, setSuggestions] = useState(''); // New state for LLM suggestions
-  const [isLoading, setIsLoading] = useState(false); // New state for loading indicator
+  const [annualSalary, setAnnualSalary] = useState('');
+  const [additionalAffordability, setAdditionalAffordability] = useState('');
+  const [suggestions, setSuggestions] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
-  // New state variables for floating rate functionality
+  // State variables for floating rate functionality
   const [rateType, setRateType] = useState('fixed');
-  const [floatingRateChange, setFloatingRateChange] = useState(0.5); // Example change of 0.5%
-  const [floatingRateChangeYear, setFloatingRateChangeYear] = useState(5); // Change occurs after 5 years
+  const [floatingRateChange, setFloatingRateChange] = useState(0.5);
+  const [floatingRateChangeYear, setFloatingRateChangeYear] = useState(5);
 
   // State variable to store the calculated amortization schedule
   const [schedule, setSchedule] = useState([]);
   const [paymentPerPeriod, setPaymentPerPeriod] = useState(0);
+  const [totalInterest, setTotalInterest] = useState(0);
 
-  // useEffect hook to re-calculate the schedule whenever inputs change
-  useEffect(() => {
-    // Map payment frequency to the number of payments per year
-    const paymentsPerYearMap = {
-      'monthly': 12,
-      '6months': 2,
-      'yearly': 1,
-      '3years': 1 / 3, // For tri-annual payments
-      '5years': 1 / 5, // For quinary payments
-    };
-
-    const paymentsPerYear = paymentsPerYearMap[paymentFrequency];
-    let ratePerPeriod = (annualRate / 100) / paymentsPerYear;
+  // Function to calculate the amortization schedule
+  const calculateSchedule = () => {
+    // Assuming monthly payments as there's no UI to change frequency.
+    const paymentsPerYear = 12;
     const totalPayments = years * paymentsPerYear;
+    
+    // Convert annual rate to a monthly rate for calculations
+    let ratePerPeriod = (annualRate / 100) / paymentsPerYear;
 
     let calculatedPayment = 0;
     
-    // Initial payment calculation for the first period
+    // Handle the edge case of a zero interest rate
     if (ratePerPeriod > 0) {
+      // The standard amortization formula for monthly payment
       calculatedPayment = (principal * ratePerPeriod) / (1 - Math.pow(1 + ratePerPeriod, -totalPayments));
     } else {
+      // If the rate is 0, payment is just principal divided by the number of payments
       calculatedPayment = principal / totalPayments;
     }
 
     const newSchedule = [];
     let remainingBalance = principal;
+    let totalInterestPaid = 0;
     
-    // The main loop for calculating the amortization schedule
+    // Loop through each payment period to build the amortization schedule
     for (let i = 1; i <= totalPayments; i++) {
-      // Logic for floating rate changes
+      // Floating rate logic: Check if the current payment period is the start of the rate change year
       if (rateType === 'floating' && Math.ceil(i / paymentsPerYear) === floatingRateChangeYear + 1) {
-        // Calculate the new rate and payment from the floating rate change year
+        // Recalculate rate and payment based on the new floating rate and remaining loan details
         ratePerPeriod = ((annualRate + floatingRateChange) / 100) / paymentsPerYear;
         const remainingPayments = totalPayments - (floatingRateChangeYear * paymentsPerYear);
         if (remainingBalance > 0 && remainingPayments > 0 && ratePerPeriod > 0) {
@@ -78,14 +75,16 @@ const App = () => {
       const interestPaid = remainingBalance * ratePerPeriod;
       let principalPaid = calculatedPayment - interestPaid;
       
-      // Adjust the final payment to clear the loan completely
+      // Edge case for the final payment to ensure the balance is exactly zero
       if (i === totalPayments) {
         principalPaid = remainingBalance;
         calculatedPayment = principalPaid + interestPaid;
       }
       
       remainingBalance -= principalPaid;
+      totalInterestPaid += interestPaid;
 
+      // Add the payment details to the schedule
       newSchedule.push({
         paymentNumber: i,
         beginningBalance: remainingBalance + principalPaid,
@@ -98,18 +97,17 @@ const App = () => {
 
     setSchedule(newSchedule);
     setPaymentPerPeriod(newSchedule.length > 0 ? newSchedule[0].paymentPerPeriod : 0);
-  }, [principal, annualRate, years, paymentFrequency, rateType, floatingRateChange, floatingRateChangeYear]);
+    setTotalInterest(totalInterestPaid);
+  };
 
-  // Function to format numbers as currency
+  // Helper function to format numbers as currency (Indian Rupees)
   const formatCurrency = (value) => {
-    // Use 'en-IN' locale for Indian Rupee formatting
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value);
   };
 
   // Function to handle the download of the amortization schedule as a CSV file
   const handleDownload = () => {
     if (schedule.length === 0) {
-      // Do nothing if there's no data to download
       return;
     }
 
@@ -124,6 +122,7 @@ const App = () => {
 
     let csvContent = headers.join(',') + '\n';
     
+    // Map the schedule data to CSV rows
     schedule.forEach(item => {
       const row = [
         item.paymentNumber,
@@ -136,6 +135,7 @@ const App = () => {
       csvContent += row + '\n';
     });
 
+    // Create a Blob and a download link
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -148,6 +148,7 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Function to get loan suggestions from the AI model
   const getLoanSuggestions = async () => {
     if (!annualSalary || !additionalAffordability) {
       setSuggestions("Please fill in your salary and additional affordability to get suggestions.");
@@ -157,11 +158,12 @@ const App = () => {
     setSuggestions('');
 
     try {
+      // Construct a clear and concise prompt for the AI
       let prompt = `Provide a simple, readable, and concise step-by-step plan for paying off a home loan sooner. Use a short, bulleted list. The plan should be based on the user's financial details and the loan terms provided. Be direct and avoid long explanations. Only include the final calculated values for the new total monthly payment, the new loan term, and the reduction in the loan term.
 - Principal: ₹${principal}
 - Annual Rate: ${annualRate}%
 - Loan Term: ${years} years
-- Payment Frequency: ${paymentFrequency}
+- Payment Frequency: monthly
 - User's annual salary: ₹${annualSalary}
 - User's additional monthly affordability: ₹${additionalAffordability}`;
 
@@ -175,7 +177,7 @@ const App = () => {
       let chatHistory = [];
       chatHistory.push({ role: "user", parts: [{ text: prompt }] });
       const payload = { contents: chatHistory };
-      const apiKey = "";
+      const apiKey = ""; // API key is automatically provided by the Canvas environment
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
       const response = await fetch(apiUrl, {
@@ -184,6 +186,10 @@ const App = () => {
         body: JSON.stringify(payload)
       });
 
+      if (!response.ok) {
+        throw new Error(`API call failed with status: ${response.status}`);
+      }
+
       const result = await response.json();
       if (result.candidates && result.candidates.length > 0 &&
         result.candidates[0].content && result.candidates[0].content.parts &&
@@ -191,19 +197,19 @@ const App = () => {
         const text = result.candidates[0].content.parts[0].text;
         setSuggestions(text);
       } else {
-        setSuggestions("Sorry, I could not generate suggestions. Please try again.");
+        setSuggestions("Sorry, I could not generate suggestions. The response format was unexpected.");
       }
     } catch (error) {
       console.error("Error fetching suggestions:", error);
-      setSuggestions("Sorry, an error occurred while generating suggestions. Please try again.");
+      setSuggestions("Sorry, an error occurred while generating suggestions. This might be due to a missing API key or a network issue. Please try again later.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    // The main container uses responsive padding and a new color palette for a home-themed design.
-    <div className="bg-gray-100 dark:bg-gray-900 p-6 sm:p-8 md:p-12 min-h-screen font-sans relative">
+    // The main container provides a responsive and aesthetically pleasing layout.
+    <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-6 md:p-8 min-h-screen font-sans relative">
       <div className="max-w-6xl mx-auto shadow-2xl rounded-2xl overflow-hidden bg-white dark:bg-gray-800">
         <div className="text-center bg-gray-200 dark:bg-gray-700 p-6 border-b-4 border-teal-700 relative">
           <div className="absolute top-4 right-4">
@@ -219,18 +225,18 @@ const App = () => {
               </svg>
             </button>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50 flex items-center justify-center gap-3">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50 flex flex-col sm:flex-row items-center justify-center gap-3">
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-700">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
             Home Loan Amortization Schedule
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
+          <p className="text-gray-600 dark:text-gray-400 mt-2 text-sm sm:text-base">
             Calculate your home loan payments and visualize the amortization schedule. 
             Calculations are based on a fixed-rate and floating-rate methods.
           </p>
-          <div className="mt-4 flex justify-center items-center gap-2 text-gray-600 dark:text-gray-300 text-sm">
+          <div className="mt-4 flex justify-center items-center gap-2 text-gray-600 dark:text-gray-300 text-xs sm:text-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-700">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
               <polyline points="22,6 12,13 2,6"></polyline>
@@ -243,10 +249,10 @@ const App = () => {
             </a>
           </div>
         </div>
-        <div className="p-6 md:p-8 lg:p-10 grid gap-8">
+        <div className="p-4 md:p-6 lg:p-8 space-y-8">
           {/* Input Form Section */}
-          <div className="grid md:grid-cols-4 gap-6">
-             <div className="grid gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid gap-2">
               <label htmlFor="rateType" className="text-sm font-medium text-gray-700 dark:text-gray-300">Loan Type</label>
               <select
                 id="rateType"
@@ -294,7 +300,7 @@ const App = () => {
             </div>
           </div>
           {rateType === 'floating' && (
-            <div className="grid md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-900 p-6 rounded-xl shadow-inner border border-gray-300 dark:border-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-900 p-6 rounded-xl shadow-inner border border-gray-300 dark:border-gray-700">
               <div className="grid gap-2">
                 <label htmlFor="floatingRateChange" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Rate Change (%)
@@ -324,17 +330,23 @@ const App = () => {
               </div>
             </div>
           )}
+          <button
+            onClick={calculateSchedule}
+            className="w-full bg-teal-700 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-teal-800 transition-colors duration-200 text-lg font-semibold"
+          >
+            Calculate
+          </button>
 
           {/* Results Summary Section */}
-          <div className="grid md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-900 p-6 rounded-xl shadow-inner border border-gray-300 dark:border-gray-700">
-            <div className="flex flex-col items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-900 p-6 rounded-xl shadow-inner border border-gray-300 dark:border-gray-700">
+            <div className="flex flex-col items-center text-center">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Payment per Period</h3>
               <p className="text-4xl font-bold text-teal-700 mt-2">{formatCurrency(paymentPerPeriod)}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">based on your selected frequency</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">based on monthly frequency</p>
             </div>
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center text-center">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Total Interest Paid</h3>
-              <p className="text-4xl font-bold text-red-600 mt-2">{formatCurrency(schedule.reduce((sum, item) => sum + item.interestPaid, 0))}</p>
+              <p className="text-4xl font-bold text-red-600 mt-2">{formatCurrency(totalInterest)}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">over the life of the loan</p>
             </div>
           </div>
@@ -347,8 +359,8 @@ const App = () => {
               </svg>
               Payment Breakdown Chart
             </h2>
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border border-gray-300 dark:border-gray-700">
-              <ResponsiveContainer width="100%" height={400}>
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border border-gray-300 dark:border-gray-700 w-full overflow-x-auto">
+              <ResponsiveContainer width="100%" minWidth={400} height={400}>
                 <LineChart data={schedule}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis
@@ -392,7 +404,9 @@ const App = () => {
                 Download as CSV
               </button>
             </div>
-            <div className="overflow-x-auto rounded-xl shadow-md border border-gray-300 dark:border-gray-700">
+            
+            {/* Table for large screens */}
+            <div className="hidden md:block overflow-x-auto rounded-xl shadow-md border border-gray-300 dark:border-gray-700">
               <table className="min-w-full">
                 <thead className="bg-gray-200 dark:bg-gray-700">
                   <tr>
@@ -407,12 +421,12 @@ const App = () => {
                 <tbody>
                   {schedule.map((item, index) => (
                     <tr key={index} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                      <td className="font-medium py-3 px-4">{item.paymentNumber}</td>
-                      <td className="py-3 px-4">{formatCurrency(item.beginningBalance)}</td>
-                      <td className="py-3 px-4">{formatCurrency(item.paymentPerPeriod)}</td>
-                      <td className="py-3 px-4">{formatCurrency(item.principalPaid)}</td>
-                      <td className="py-3 px-4">{formatCurrency(item.interestPaid)}</td>
-                      <td className={`py-3 px-4 ${item.remainingBalance === 0 ? 'text-green-600 font-bold' : ''}`}>
+                      <td className="font-medium py-3 px-4 whitespace-nowrap">{item.paymentNumber}</td>
+                      <td className="py-3 px-4 whitespace-nowrap">{formatCurrency(item.beginningBalance)}</td>
+                      <td className="py-3 px-4 whitespace-nowrap">{formatCurrency(item.paymentPerPeriod)}</td>
+                      <td className="py-3 px-4 whitespace-nowrap">{formatCurrency(item.principalPaid)}</td>
+                      <td className="py-3 px-4 whitespace-nowrap">{formatCurrency(item.interestPaid)}</td>
+                      <td className={`py-3 px-4 whitespace-nowrap ${item.remainingBalance === 0 ? 'text-green-600 font-bold' : ''}`}>
                         {formatCurrency(item.remainingBalance)}
                       </td>
                     </tr>
@@ -420,11 +434,43 @@ const App = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Card view for mobile screens */}
+            <div className="md:hidden grid grid-cols-1 gap-4">
+              {schedule.map((item, index) => (
+                <div key={index} className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border border-gray-300 dark:border-gray-700">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-lg text-teal-700">Payment #{item.paymentNumber}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Total: {formatCurrency(item.paymentPerPeriod)}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Beginning Balance</span>
+                      <span className="text-base">{formatCurrency(item.beginningBalance)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Principal Paid</span>
+                      <span className="text-base">{formatCurrency(item.principalPaid)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Interest Paid</span>
+                      <span className="text-base text-red-600">{formatCurrency(item.interestPaid)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Remaining Balance</span>
+                      <span className={`text-base ${item.remainingBalance === 0 ? 'text-green-600 font-bold' : ''}`}>
+                        {formatCurrency(item.remainingBalance)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* New Suggestions Section */}
           <div className="bg-gray-50 dark:bg-gray-900 p-6 rounded-xl shadow-md border border-gray-300 dark:border-gray-700">
-            <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-50 mb-4 flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-50 mb-4 flex flex-col sm:flex-row items-center justify-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-700">
                 <path d="M12 2a10 10 0 0 1 7.27 17.27L12 22l-7.27-2.73A10 10 0 0 1 12 2z" />
                 <path d="M12 18v-6" />
@@ -437,14 +483,13 @@ const App = () => {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-2 text-center">
               Participation is voluntary, and individuals are expected to assess and accept any potential risks.
             </p>
-            {/* Added a note about using an AI tool */}
             <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1 mb-4 text-center">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-500">
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
               <span>Suggestions are generated by an AI tool.</span>
             </p>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <label htmlFor="annualSalary" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Annual Salary (₹)
@@ -484,19 +529,12 @@ const App = () => {
                 </svg>
               ) : (
                 <>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="12" x2="12" y1="12" y2="18" />
-                    <line x1="15" x2="9" y1="15" y2="15" />
-                  </svg>
                   Get Suggestions
                 </>
               )}
             </button>
             {suggestions && (
               <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 shadow-sm prose dark:prose-invert">
-                {/* We use dangerouslySetInnerHTML to render the markdown content */}
                 <div dangerouslySetInnerHTML={{ __html: suggestions }} />
               </div>
             )}
@@ -509,7 +547,7 @@ const App = () => {
         </div>
         <div className="p-6 md:p-8 lg:p-10 text-center bg-gray-200 dark:bg-gray-700 border-t-4 border-teal-700">
           <p className="text-sm text-gray-600 dark:text-gray-400 w-full">
-            Calculations are based on a fixed-rate and floating-rate .
+            Calculations are based on a fixed-rate and floating-rate.
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400 w-full mt-2">
             © {new Date().getFullYear()} Muthumahesh. All Rights Reserved.
@@ -519,11 +557,10 @@ const App = () => {
 
       {/* Help Modal */}
       {showHelpModal && (
-        // The modal is positioned absolutely and uses flexbox to center its content, making it responsive by default.
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setShowHelpModal(false)}>
           <div 
             className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full p-6 relative"
-            onClick={(e) => e.stopPropagation()} // Prevent clicks inside from closing the modal
+            onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Help</h2>
             <button
