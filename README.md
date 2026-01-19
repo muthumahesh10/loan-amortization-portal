@@ -1,46 +1,159 @@
-Home Loan Amortization Schedule
-This guide explains how to use the home loan calculator.
+# Home Loan Amortization Portal
 
-1. Using the Calculator
-This is where you enter your loan details.
+<img src="public/logo192.png" alt="App logo" width="120">
 
-Loan Type: Choose if your interest rate will stay the same (Fixed Rate) or might change (Floating Rate).
+A small web application to calculate and visualize a home loan amortization schedule. The project contains:
 
-Loan Amount: How much money are you borrowing?
+- A primary React application (Create React App + CRACO) in the repository root with an amortization calculator, charting (Recharts), CSV export, and suggestion UI.
+- Two example apps in subfolders:
+  - `my-amortization-app` — Vue 3 + TypeScript + Vite example
+  - `my-tailwind-app` — React + Vite + Tailwind example
 
-Interest Rate: What is the yearly interest rate for your loan?
+Table of contents
+- Quickstart
+- Available scripts
+- Features
+- Usage (how to use the calculator)
+- Project structure
+- Running the sub-apps
+- Development notes & troubleshooting
+- Contributing
+- License
 
-Loan Term: How many years do you have to pay back the loan?
+## Quickstart
 
-Floating Rate Options: If you choose a "Floating Rate" loan, you will see two more boxes:
+Requirements
+- Node.js (recommended >= 16)
+- npm (or yarn)
 
-Rate Change: How much the interest rate will go up or down.
+Install dependencies and start the root React app:
+```bash
+# from repository root
+npm install
+npm start
+```
 
-Change after: In which year will the interest rate change?
+Open http://localhost:3000 in your browser.
 
-Calculate: Click this button when you are ready.
+Note: This project uses CRACO to integrate Tailwind/PostCSS with Create React App. If you change PostCSS/Tailwind files, restart the dev server.
 
-2. Your Results
-After you click "Calculate," you will see your results.
+## Available scripts (root)
 
-Payment per Period: This is the amount you need to pay every month.
+From the repository root:
 
-Total Interest Paid: This is the total extra money you will pay in interest over the years.
+- `npm start` — start development server (CRACO -> react-scripts)
+- `npm run build` — produce a production build
+- `npm test` — run tests (CRACO wrapper)
+- `npm run eject` — (CRA) eject config (irreversible action)
 
-The Chart and Table
-The Chart: This picture shows you how your monthly payment is split. At first, more of your money goes to interest. Later, more of your money goes to paying off the loan itself.
+The root `package.json` uses CRACO and PostCSS/Tailwind (see `craco.config.js` and `postcss.config.js`).
 
-The Table: This long list shows you every single payment you will make. It shows how much goes to interest and how much goes to the loan each month.
+## Features
 
-Download as CSV: Click this button to save the table on your computer.
+- Monthly amortization calculation with:
+  - Loan amount (principal)
+  - Annual interest rate
+  - Loan term (years)
+  - Floating-rate support (single rate change after N years)
+- Payment schedule table (per-period breakdown: principal, interest, remaining balance)
+- Chart visualizing principal vs interest over time (Recharts)
+- CSV download of the amortization schedule
+- "Suggestions" panel — simple plan / tips calculated based on optional inputs (Annual salary / Extra monthly payment)
+- Simple, easy-to-read UI and an approachable codebase for modification
 
-3. Suggestions
-This section gives you ideas on how to pay off your loan faster.
+## Usage — amortization calculator
 
-Annual Salary: Type in how much money you earn in one year.
+1. Enter loan details:
+   - Loan amount (principal)
+   - Interest rate (annual percentage)
+   - Loan term (in years)
 
-Extra Monthly Payment: How much extra money can you pay towards your loan each month?
+2. Choose loan type:
+   - Fixed Rate — interest rate is constant for the loan term.
+   - Floating Rate — set the expected rate change (e.g., +0.5%) and the year after which the change applies.
 
-Get Suggestions: Click this button to get a simple plan from an AI.
+3. Click "Calculate" (or equivalent button in the UI).
 
-Please Note: The suggestions are just ideas from a computer. They are not professional advice. You should always talk to a financial expert for real advice.
+What you get:
+- Payment per period (monthly amount)
+- Total interest over the loan lifetime
+- Chart: visual split of interest vs principal across periods
+- Full table listing each payment's principal and interest components and remaining balance
+- CSV download: Save the table locally for further analysis
+
+Suggestions:
+- Provide Annual Salary and Extra Monthly Payment to get suggested options to accelerate payoff.
+- Suggestions are informational only — not professional financial advice.
+
+## CSV export
+
+The app generates CSV from the computed amortization schedule. Click the CSV/Download button to save the schedule to your computer for spreadsheet analysis.
+
+## Project structure (important files)
+
+- src/
+  - App.js — main application logic and UI for the amortization calculator (calculations, chart, CSV export)
+  - index.js — app entry point
+  - App.css, index.css — styles used by the CRA app
+- public/
+  - index.html — base HTML template (includes Tailwind CDN for convenience)
+  - logo192.png, logo512.png — icons used in README/manifest
+- craco.config.js — config to load PostCSS/Tailwind into CRA
+- postcss.config.js — PostCSS plugins (tailwindcss, autoprefixer)
+- tailwind.config.js — tailwind configuration
+- my-amortization-app/ — Vue 3 + Vite + TypeScript sample app
+- my-tailwind-app/ — React + Vite + Tailwind sample app
+
+## Running the sub-apps
+
+Both example sub-apps are independent and have their own package.json files.
+
+my-amortization-app (Vue + Vite)
+```bash
+cd my-amortization-app
+npm install
+npm run dev
+# open the URL reported by Vite, typically http://localhost:5173
+```
+
+my-tailwind-app (React + Vite)
+```bash
+cd my-tailwind-app
+npm install
+npm run dev
+# open the URL reported by Vite
+```
+
+## Development notes & troubleshooting
+
+- CRACO + Tailwind (CRA compatibility)
+  - The repository uses CRACO to integrate Tailwind into a CRA project. craco.config.js and postcss.config.js are present at the root.
+  - If you change PostCSS or tailwind config, restart the dev server.
+
+- Duplicate or altered package.json scripts:
+  - The root package.json contains CRACO scripts. If you see unexpected script behavior, run `npm run` to list available scripts and confirm which one you need.
+
+- If you encounter build or dependency errors:
+  - Remove node_modules and lock file and reinstall:
+    ```bash
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
+  - Ensure your Node version is compatible (>= 16 recommended).
+
+- If charts do not render:
+  - Verify `recharts` is installed (root package.json depends on `recharts`).
+  - Ensure your browser supports modern JavaScript (React 18+).
+
+## How the amortization calculation works (high level)
+
+- Payments are assumed monthly.
+- Rate per period is derived from annual rate divided by 12.
+- Standard amortization formula is used to compute monthly payments when interest > 0:
+  payment = (principal * ratePerPeriod) / (1 - (1 + ratePerPeriod)^(-totalPayments))
+- For a floating rate option, when the schedule reaches the configured change year, the rate and payments are recalculated for the remaining balance and periods.
+
+You can find the calculation and schedule building logic in `src/App.js` — look for the function that iterates over payment periods to construct the schedule.
+
+
+
